@@ -72,3 +72,90 @@ def get_packet_count(pcap_path: str | Path) -> int:
     raise TSharkError(
         "Could not determine packet count from TShark output."
     )
+
+def extract_basic_packets(pcap_path: str | Path) -> list[dict]:
+    """
+    Extract basic packet metadata from a PCAP using TShark.
+
+    Returns one dictionary per packet containing:
+    - frame number
+    - timestamp
+    - packet length
+    - protocol
+    - source IP
+    - destination IP
+    """
+
+    pcap_path = Path(pcap_path)
+
+    if not pcap_path.is_file():
+        raise FileNotFoundError(f"PCAP file not found: {pcap_path}")
+
+    command = [
+        "tshark",
+        "-r",
+        str(pcap_path),
+        "-T",
+        "fields",
+        "-e",
+        "frame.number",
+        "-e",
+        "frame.time_epoch",
+        "-e",
+        "frame.len",
+        "-e",
+        "_ws.col.Protocol",
+        "-e",
+        "ip.src",
+        "-e",
+        "ip.dst",
+        "-E",
+        "separator=\t",
+        "-E",
+        "quote=n",
+        "-E",
+        "occurrence=f",
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        raise TSharkError("Unable to execute TShark.") from exc
+
+    if result.returncode != 0:
+        error_message = result.stderr.strip() or "Unknown TShark error."
+        raise TSharkError(error_message)
+
+    packets = []
+
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+
+        fields = line.split("\t")
+
+        if len(fields) != 6:
+            continue
+
+        frame_number, timestamp, length, protocol, source, destination = fields
+
+        try:
+            packet = {
+                "frame_number": int(frame_number),
+                "timestamp": float(timestamp),
+                "length": int(length),
+                "protocol": protocol or None,
+                "source": source or None,
+                "destination": destination or None,
+            }
+        except ValueError:
+            continue
+
+        packets.append(packet)
+
+    return packets
