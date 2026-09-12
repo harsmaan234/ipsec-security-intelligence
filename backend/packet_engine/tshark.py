@@ -159,3 +159,38 @@ def extract_basic_packets(pcap_path: str | Path) -> list[dict]:
         packets.append(packet)
 
     return packets
+
+def detect_ipsec_protocols(pcap_path: str | Path) -> dict:
+    """
+    Detect IPsec-related protocols present in a PCAP.
+
+    TShark 4.2.x exposes IKE/ISAKMP using the
+    'isakmp' protocol identifier.
+
+    Returns normalized project-level protocol counts.
+    """
+
+    packets = extract_basic_packets(pcap_path)
+
+    protocol_counts = {
+        "IKE": 0,
+        "ESP": 0,
+        "AH": 0,
+    }
+
+    for packet in packets:
+        protocol = (packet["protocol"] or "").upper()
+
+        if "ISAKMP" in protocol:
+            protocol_counts["IKE"] += 1
+
+        if "ESP" in protocol:
+            protocol_counts["ESP"] += 1
+
+        if protocol == "AH":
+            protocol_counts["AH"] += 1
+
+    return {
+        "observed": any(protocol_counts.values()),
+        "protocol_counts": protocol_counts,
+    }

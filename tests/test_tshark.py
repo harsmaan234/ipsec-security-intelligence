@@ -4,6 +4,7 @@ import pytest
 
 from backend.packet_engine.tshark import (
     TSharkError,
+    detect_ipsec_protocols,
     extract_basic_packets,
     get_packet_count,
 )
@@ -36,3 +37,13 @@ def test_extract_basic_packets():
     assert first_packet["source"] == "10.0.0.1"
     assert first_packet["destination"] == "10.0.0.2"
     assert isinstance(first_packet["timestamp"], float)
+
+def test_detect_ipsec_protocols():
+    pcap_path = "tests/data/basic_traffic.pcap"
+
+    result = detect_ipsec_protocols(pcap_path)
+
+    assert result["observed"] is False
+    assert result["protocol_counts"]["IKE"] == 0
+    assert result["protocol_counts"]["ESP"] == 0
+    assert result["protocol_counts"]["AH"] == 0
