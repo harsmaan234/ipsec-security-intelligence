@@ -1,0 +1,49 @@
+  rules:
+  - id: IPSEC-CRYPTO-001
+    name: Weak encryption algorithm
+    category: cryptography
+    severity: high
+    description: >
+      The observed IKE encryption algorithm is considered weak
+      for modern IPsec deployments.
+    condition:
+      field: selected_proposal.encryption
+      operator: in
+      values:
+        - 3DES
+        - DES
+    recommendation: >
+      Replace weak encryption with AES-GCM or another approved
+      modern authenticated encryption algorithm.
+
+  - id: IPSEC-CRYPTO-002
+    name: Weak integrity algorithm
+    category: cryptography
+    severity: medium
+    description: >
+      The observed integrity algorithm is legacy or weaker
+      than currently preferred alternatives.
+    condition:
+      field: selected_proposal.prf
+      operator: in
+      values:
+        - HMAC-SHA1
+    recommendation: >
+      Prefer SHA-256 or stronger approved cryptographic primitives.
+
+  - id: IPSEC-CRYPTO-003
+    name: Weak Diffie-Hellman group
+    category: cryptography
+    severity: high
+    description: >
+      The observed Diffie-Hellman group provides insufficient
+      cryptographic strength for a modern deployment.
+    condition:
+      field: selected_proposal.dh_group
+      operator: in
+      values:
+        - MODP-1024
+    recommendation: >
+      Use a stronger approved Diffie-Hellman or elliptic-curve group.
+
+
