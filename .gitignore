@@ -29,3 +29,6 @@ reports/generated/
 # ML artifacts
 ml/models/*.pkl
 ml/models/*.joblib
+
+# Local strongSwan secrets
+testbed/strongswan/**/ipsec.secrets
