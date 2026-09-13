@@ -1,0 +1,39 @@
+categories:
+  cryptography:
+    weight: 30
+
+  key_exchange:
+    weight: 20
+
+  security_configuration:
+    weight: 20
+
+  sa_security:
+    weight: 15
+
+  metadata_exposure:
+    weight: 15
+
+severity_penalties:
+  info: 0
+  low: 10
+  medium: 25
+  high: 50
+  critical: 75
+
+risk_levels:
+  - minimum: 90
+    maximum: 100
+    level: LOW
+
+  - minimum: 70
+    maximum: 89.99
+    level: MEDIUM
+
+  - minimum: 40
+    maximum: 69.99
+    level: HIGH
+
+  - minimum: 0
+    maximum: 39.99
+    level: CRITICAL

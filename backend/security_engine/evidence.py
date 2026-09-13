@@ -35,6 +35,7 @@ def create_assessment_control(
     name: str,
     status: str,
     reason: str,
+    category: str | None = None,
     evidence_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     """
@@ -55,13 +56,13 @@ def create_assessment_control(
         )
 
     return {
-        "control_id": control_id,
-        "name": name,
-        "status": status,
-        "reason": reason,
-        "evidence_refs": evidence_refs or [],
+    "control_id": control_id,
+    "name": name,
+    "status": status,
+    "reason": reason,
+    "category": category,
+    "evidence_refs": evidence_refs or [],
     }
-
 
 def calculate_coverage(
     controls: list[dict[str, Any]],
