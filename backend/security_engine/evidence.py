@@ -117,8 +117,9 @@ def build_assessment(
     coverage = calculate_coverage(controls)
 
     return {
-        "observations": observations,
-        "controls": controls,
-        "findings": findings,
-        "coverage": coverage,
+    "observations": observations,
+    "controls": controls,
+    "findings": findings,
+    "finding_count": len(findings),
+    "coverage": coverage,
     }
