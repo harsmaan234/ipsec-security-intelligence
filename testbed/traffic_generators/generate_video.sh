@@ -3,16 +3,19 @@
 set -euo pipefail
 
 SAMPLE_ID="${1:-}"
-COUNT="${2:-}"
+REQUESTS="${2:-}"
 INTERVAL="${3:-}"
+LIMIT_RATE="${4:-5m}"
+PORT="${5:-8081}"
+PATH_TARGET="${6:-/video_sample.bin}"
 
-if [[ -z "$SAMPLE_ID" || -z "$COUNT" || -z "$INTERVAL" ]]; then
-    echo "Usage: $0 <sample_id> <count> <interval_seconds>"
+if [[ -z "$SAMPLE_ID" || -z "$REQUESTS" || -z "$INTERVAL" ]]; then
+    echo "Usage: $0 <sample_id> <requests> <interval_seconds> [limit_rate] [port] [path]"
     exit 1
 fi
 
-if ! [[ "$COUNT" =~ ^[0-9]+$ ]]; then
-    echo "COUNT must be an integer"
+if ! [[ "$REQUESTS" =~ ^[0-9]+$ ]]; then
+    echo "REQUESTS must be an integer"
     exit 1
 fi
 
@@ -36,12 +39,15 @@ OUTPUT="ml/datasets/pcaps/${SAMPLE_ID}.pcap"
 mkdir -p ml/datasets/pcaps
 
 echo "Sample ID : $SAMPLE_ID"
-echo "Packets   : $COUNT"
+echo "Requests  : $REQUESTS"
 echo "Interval  : ${INTERVAL}s"
+echo "Rate      : $LIMIT_RATE"
+echo "Server    : 10.10.10.2:${PORT}"
+echo "Path      : $PATH_TARGET"
 echo "Output    : $OUTPUT"
 
 sudo bash -c \
-    "exec ip netns exec vpn-a tcpdump -i veth-a -nn -s 0 -w '$OUTPUT' 'esp' >/tmp/ipsec_icmp_capture.log 2>&1" &
+    "exec ip netns exec vpn-a tcpdump -i veth-a -nn -s 0 -w '$OUTPUT' 'esp' >/tmp/ipsec_video_capture.log 2>&1" &
 
 TCPDUMP_PID=$!
 
@@ -55,10 +61,10 @@ trap cleanup EXIT
 
 sleep 1
 
-echo "Generating ICMP traffic..."
+echo "Generating VIDEO traffic..."
 
 sudo bash -c \
-    "exec ip netns exec vpn-a ping -c '$COUNT' -i '$INTERVAL' 10.10.10.2 >/tmp/ipsec_icmp_ping.log 2>&1"
+    "exec ip netns exec vpn-a bash -c 'for i in \$(seq 1 $REQUESTS); do curl -fsS --limit-rate $LIMIT_RATE -o /dev/null http://10.10.10.2:${PORT}${PATH_TARGET}; sleep ${INTERVAL}; done' >/tmp/ipsec_video_requests.log 2>&1"
 
 sleep 1
 

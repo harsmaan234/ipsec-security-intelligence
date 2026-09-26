@@ -1,4 +1,14 @@
 sample_id,pcap_path,traffic_class,label_source,testbed_scenario
-icmp_001,tests/data/ipsec_icmp.pcap,ICMP,CONTROLLED_TESTBED,strong
-web_001,tests/data/ipsec_web.pcap,WEB,CONTROLLED_TESTBED,strong
-video_001,tests/data/ipsec_video.pcap,VIDEO,CONTROLLED_TESTBED,strong
+icmp_001,ml/datasets/pcaps/icmp_001.pcap,ICMP,CONTROLLED_TESTBED,strong
+icmp_002,ml/datasets/pcaps/icmp_002.pcap,ICMP,CONTROLLED_TESTBED,strong
+icmp_003,ml/datasets/pcaps/icmp_003.pcap,ICMP,CONTROLLED_TESTBED,strong
+icmp_004,ml/datasets/pcaps/icmp_004.pcap,ICMP,CONTROLLED_TESTBED,strong
+icmp_005,ml/datasets/pcaps/icmp_005.pcap,ICMP,CONTROLLED_TESTBED,strong
+web_002,ml/datasets/pcaps/web_002.pcap,WEB,CONTROLLED_TESTBED,strong
+web_003,ml/datasets/pcaps/web_003.pcap,WEB,CONTROLLED_TESTBED,strong
+web_004,ml/datasets/pcaps/web_004.pcap,WEB,CONTROLLED_TESTBED,strong
+web_005,ml/datasets/pcaps/web_005.pcap,WEB,CONTROLLED_TESTBED,strong
+video_002,ml/datasets/pcaps/video_002.pcap,VIDEO,CONTROLLED_TESTBED,strong
+video_003,ml/datasets/pcaps/video_003.pcap,VIDEO,CONTROLLED_TESTBED,strong
+video_004,ml/datasets/pcaps/video_004.pcap,VIDEO,CONTROLLED_TESTBED,strong
+video_005,ml/datasets/pcaps/video_005.pcap,VIDEO,CONTROLLED_TESTBED,strong
