@@ -1,0 +1,2 @@
+sample_id,pcap_path,traffic_class,label_source,testbed_scenario
+icmp_001,tests/data/ipsec_icmp.pcap,ICMP,CONTROLLED_TESTBED,strong
