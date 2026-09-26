@@ -1,3 +1,4 @@
 sample_id,pcap_path,traffic_class,label_source,testbed_scenario
 icmp_001,tests/data/ipsec_icmp.pcap,ICMP,CONTROLLED_TESTBED,strong
 web_001,tests/data/ipsec_web.pcap,WEB,CONTROLLED_TESTBED,strong
+video_001,tests/data/ipsec_video.pcap,VIDEO,CONTROLLED_TESTBED,strong
