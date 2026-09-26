@@ -35,3 +35,12 @@ testbed/strongswan/**/ipsec.secrets
 
 # Generated ML dataset PCAPs
 ml/datasets/pcaps/*.pcap
+
+# Frontend dependencies
+frontend/node_modules/
+
+# Frontend build output
+frontend/dist/
+
+# Frontend TypeScript build info
+frontend/*.tsbuildinfo
