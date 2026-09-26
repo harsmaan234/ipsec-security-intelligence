@@ -32,3 +32,6 @@ ml/models/*.joblib
 
 # Local strongSwan secrets
 testbed/strongswan/**/ipsec.secrets
+
+# Generated ML dataset PCAPs
+ml/datasets/pcaps/*.pcap
