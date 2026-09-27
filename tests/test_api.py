@@ -161,3 +161,152 @@ def test_security_simulation_endpoint():
         finding["rule_id"] == "IPSEC-CRYPTO-003"
         for finding in projected_findings
     )
+def test_generate_executive_report_endpoint():
+    with PCAP_PATH.open("rb") as pcap_file:
+        response = client.post(
+            "/api/v1/reports/generate",
+            data={
+                "report_type": "executive",
+            },
+            files={
+                "file": (
+                    "ipsec_full_handshake.pcap",
+                    pcap_file,
+                    "application/vnd.tcpdump.pcap",
+                )
+            },
+        )
+
+    assert response.status_code == 200
+
+    assert response.headers["content-type"].startswith(
+        "application/pdf"
+    )
+
+    assert "attachment" in response.headers.get(
+        "content-disposition",
+        "",
+    )
+
+    assert "executive" in response.headers.get(
+        "content-disposition",
+        "",
+    )
+
+    assert response.content.startswith(b"%PDF")
+
+    assert len(response.content) > 1000
+
+
+def test_generate_technical_report_endpoint():
+    with PCAP_PATH.open("rb") as pcap_file:
+        response = client.post(
+            "/api/v1/reports/generate",
+            data={
+                "report_type": "technical",
+            },
+            files={
+                "file": (
+                    "ipsec_full_handshake.pcap",
+                    pcap_file,
+                    "application/vnd.tcpdump.pcap",
+                )
+            },
+        )
+
+    assert response.status_code == 200
+
+    assert response.headers["content-type"].startswith(
+        "application/pdf"
+    )
+
+    assert "attachment" in response.headers.get(
+        "content-disposition",
+        "",
+    )
+
+    assert "technical" in response.headers.get(
+        "content-disposition",
+        "",
+    )
+
+    assert response.content.startswith(b"%PDF")
+
+    assert len(response.content) > 1000
+def test_executive_report_endpoint():
+    pcap_path = Path(__file__).parent / "data" / "ipsec_full_handshake.pcap"
+
+    with pcap_path.open("rb") as pcap_file:
+        response = client.post(
+            "/api/v1/reports/generate",
+            files={
+                "file": (
+                    "ipsec_full_handshake.pcap",
+                    pcap_file,
+                    "application/vnd.tcpdump.pcap",
+                )
+            },
+            data={
+                "report_type": "executive",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "application/pdf"
+    )
+    assert (
+        "ipsec-security-executive-ipsec_full_handshake.pdf"
+        in response.headers["content-disposition"]
+    )
+    assert response.content.startswith(b"%PDF")
+
+
+def test_technical_report_endpoint():
+    pcap_path = Path(__file__).parent / "data" / "ipsec_full_handshake.pcap"
+
+    with pcap_path.open("rb") as pcap_file:
+        response = client.post(
+            "/api/v1/reports/generate",
+            files={
+                "file": (
+                    "ipsec_full_handshake.pcap",
+                    pcap_file,
+                    "application/vnd.tcpdump.pcap",
+                )
+            },
+            data={
+                "report_type": "technical",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "application/pdf"
+    )
+    assert (
+        "ipsec-security-technical-ipsec_full_handshake.pdf"
+        in response.headers["content-disposition"]
+    )
+    assert response.content.startswith(b"%PDF")
+
+
+def test_report_endpoint_rejects_invalid_report_type():
+    pcap_path = Path(__file__).parent / "data" / "ipsec_full_handshake.pcap"
+
+    with pcap_path.open("rb") as pcap_file:
+        response = client.post(
+            "/api/v1/reports/generate",
+            files={
+                "file": (
+                    "ipsec_full_handshake.pcap",
+                    pcap_file,
+                    "application/vnd.tcpdump.pcap",
+                )
+            },
+            data={
+                "report_type": "invalid",
+            },
+        )
+
+    assert response.status_code == 400

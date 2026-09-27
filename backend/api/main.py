@@ -1,13 +1,17 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.ai_engine.traffic_classifier import classify_traffic
 from backend.feature_engine.traffic_features import extract_traffic_features
 from backend.fusion_engine.pipeline import analyze_pcap
+from backend.report_engine.pdf_report import (
+    generate_executive_report,
+    generate_technical_report,
+)
 from backend.security_engine.metadata_exposure import assess_metadata_exposure
 from backend.security_engine.what_if import simulate_security_change
 
@@ -167,3 +171,129 @@ def simulate_security_endpoint(
             status_code=500,
             detail=f"Security simulation failed: {exc}",
         ) from exc
+@app.post("/api/v1/reports/generate")
+async def generate_report_endpoint(
+    file: UploadFile = File(...),
+    report_type: str = Form(...),
+):
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="PCAP file is required",
+        )
+
+    suffix = Path(file.filename).suffix.lower()
+
+    if suffix not in {".pcap", ".pcapng", ".cap"}:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Unsupported file type. "
+                "Expected .pcap, .pcapng, or .cap"
+            ),
+        )
+
+    if report_type not in {"executive", "technical"}:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid report_type. "
+                "Expected 'executive' or 'technical'"
+            ),
+        )
+
+    temporary_path = None
+
+    try:
+        with NamedTemporaryFile(
+            suffix=suffix,
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+
+            while True:
+                chunk = await file.read(1024 * 1024)
+
+                if not chunk:
+                    break
+
+                temporary_file.write(chunk)
+
+        analysis = analyze_pcap(temporary_path)
+
+        analysis["pcap"]["filename"] = file.filename
+
+        feature_vectors = extract_traffic_features(
+            analysis["esp"]
+        )
+
+        traffic_results = []
+
+        for feature_vector in feature_vectors:
+            classification = classify_traffic(
+                feature_vector
+            )
+
+            metadata_exposure = assess_metadata_exposure(
+                feature_vector
+            )
+
+            traffic_results.append(
+                {
+                    "features": feature_vector,
+                    "classification": classification,
+                    "metadata_exposure": metadata_exposure,
+                }
+            )
+
+        analysis["traffic_intelligence"] = {
+            "flow_count": len(traffic_results),
+            "flows": traffic_results,
+        }
+
+        if report_type == "executive":
+            pdf_bytes = generate_executive_report(
+                analysis
+            )
+            report_name = (
+                f"ipsec-security-executive-"
+                f"{Path(file.filename).stem}.pdf"
+            )
+        else:
+            pdf_bytes = generate_technical_report(
+                analysis
+            )
+            report_name = (
+                f"ipsec-security-technical-"
+                f"{Path(file.filename).stem}.pdf"
+            )
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{report_name}"'
+                )
+            },
+        )
+
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Report generation failed: {exc}",
+        ) from exc
+
+    finally:
+        await file.close()
+
+        if temporary_path is not None:
+            temporary_path.unlink(
+                missing_ok=True,
+            )

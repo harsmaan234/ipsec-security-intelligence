@@ -4,7 +4,13 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from backend.security_engine.crypto_profile import (
+    evaluate_crypto_configuration,
+)
 from backend.security_engine.assessment import assess_security
+from backend.security_engine.crypto_profile import (
+    calculate_crypto_strength,
+)
 from backend.security_engine.evidence import (
     STATUS_ASSESSED,
     STATUS_NOT_ASSESSED,
@@ -173,6 +179,42 @@ def _build_observations(
 
     return observations
 
+def _profile_findings(
+    evidence: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Convert the crypto profile evaluation into scoring findings."""
+
+    proposal = _get_nested_value(
+        evidence,
+        "ike.selected_proposal",
+    )
+
+    if not proposal:
+        return []
+
+    result = evaluate_crypto_configuration(
+        {
+            "encryption": proposal.get("encryption"),
+            "dh_group": proposal.get("dh_group"),
+        }
+    )
+
+    return result.get("findings", [])
+
+def _filter_profile_overlaps(
+    findings: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep YAML findings that are not replaced by crypto profiles."""
+
+    return [
+        finding
+        for finding in findings
+        if finding.get("evidence", {}).get("field")
+        not in {
+            "selected_proposal.encryption",
+            "selected_proposal.dh_group",
+        }
+    ]
 
 def simulate_security_change(
     current_evidence: dict[str, Any],
@@ -196,6 +238,10 @@ def simulate_security_change(
 
     projected_evidence = deepcopy(current_evidence)
 
+    current_crypto_strength = calculate_crypto_strength(
+        current_evidence.get("ike", {}).get("selected_proposal")
+    )
+
     applied_changes = []
 
     for field, value in changes.items():
@@ -217,15 +263,44 @@ def simulate_security_change(
                 "projected_value": value,
             }
         )
+    projected_crypto_strength = calculate_crypto_strength(
+        projected_evidence.get("ike", {}).get("selected_proposal")
+    )
 
-    current_assessment_result = assess_security(
+    current_rule_result = assess_security(
         current_evidence["ike"],
         CRYPTO_RULE_PATH,
     )
 
-    projected_assessment_result = assess_security(
+    projected_rule_result = assess_security(
         projected_evidence["ike"],
         CRYPTO_RULE_PATH,
+    )
+
+    current_rule_findings = _filter_profile_overlaps(
+        current_rule_result["findings"]
+    )
+
+    projected_rule_findings = _filter_profile_overlaps(
+        projected_rule_result["findings"]
+    )
+
+    current_profile_findings = _profile_findings(
+        current_evidence,
+    )
+
+    projected_profile_findings = _profile_findings(
+        projected_evidence,
+    )
+
+    current_findings = (
+        current_rule_findings
+        + current_profile_findings
+    )
+
+    projected_findings = (
+        projected_rule_findings
+        + projected_profile_findings
     )
 
     current_controls = _build_controls(
@@ -241,7 +316,7 @@ def simulate_security_change(
             current_evidence,
         ),
         controls=current_controls,
-        findings=current_assessment_result["findings"],
+        findings=current_findings,
     )
 
     projected_assessment = build_assessment(
@@ -249,18 +324,18 @@ def simulate_security_change(
             projected_evidence,
         ),
         controls=projected_controls,
-        findings=projected_assessment_result["findings"],
+        findings=projected_findings,
     )
 
     current_score = calculate_security_score(
         controls=current_controls,
-        findings=current_assessment_result["findings"],
+        findings=current_findings,
         rule_path=SCORE_RULE_PATH,
     )
 
     projected_score = calculate_security_score(
         controls=projected_controls,
-        findings=projected_assessment_result["findings"],
+        findings=projected_findings,
         rule_path=SCORE_RULE_PATH,
     )
 
@@ -284,10 +359,12 @@ def simulate_security_change(
         "source": "deterministic_security_rules",
         "changes": applied_changes,
         "current": {
+            "crypto_strength": current_crypto_strength,
             "assessment": current_assessment,
             "score": current_score,
         },
         "projected": {
+            "crypto_strength": projected_crypto_strength,
             "assessment": projected_assessment,
             "score": projected_score,
         },

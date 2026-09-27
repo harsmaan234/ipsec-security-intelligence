@@ -25,14 +25,41 @@ def test_full_ipsec_pipeline():
     assert result["esp"]["observed"] is True
     assert result["esp"]["packet_count"] == 40
 
-    assert result["assessment"]["coverage"]["assessed"] == 1
+    assert result["assessment"]["coverage"]["assessed"] == 2
+    assert result["assessment"]["coverage"]["total_applicable"] == 4
+    assert result["assessment"]["coverage"]["percentage"] == 50.0
 
-    assert result["assessment"]["findings"] == []
+    controls = {
+        control["control_id"]: control
+        for control in result["assessment"]["controls"]
+    }
 
-    assert result["score"]["score"] == 100.0
+    assert controls["IPSEC-CRYPTO-001"]["status"] == "ASSESSED"
+    assert controls["IPSEC-META-001"]["status"] == "ASSESSED"
+    assert controls["IPSEC-PFS-001"]["status"] == "NOT_ASSESSED"
+    assert controls["IPSEC-REPLAY-001"]["status"] == "NOT_ASSESSED"
+
+    assert result["metadata_assessment"]["observed"] is True
+    assert result["metadata_assessment"]["provenance"] == "ASSESSED"
+    assert result["metadata_assessment"]["overall_exposure"] == "MEDIUM"
+    assert result["metadata_assessment"]["finding_count"] == 1
+
+    metadata_findings = [
+        finding
+        for finding in result["assessment"]["findings"]
+        if finding["category"] == "metadata_exposure"
+    ]
+
+    assert len(metadata_findings) == 1
+    assert metadata_findings[0]["rule_id"] == "IPSEC-META-BURST_PATTERN"
+    assert metadata_findings[0]["severity"] == "medium"
+    assert metadata_findings[0]["provenance"] == "ASSESSED"
+
+    assert result["score"]["score"] == 91.67
     assert result["score"]["risk_level"] == "LOW"
+    assert result["score"]["scoring_coverage"] == 45.0
 
-    assert result["score"]["scoring_coverage"] == 30.0
+    assert result["score"]["risk_level"] == "LOW"
 
 
 def test_pipeline_preserves_not_assessed_controls():
@@ -59,7 +86,7 @@ def test_pipeline_preserves_not_assessed_controls():
 
     assert (
         controls_by_id["IPSEC-META-001"]["status"]
-        == "NOT_ASSESSED"
+        == "ASSESSED"
     )
 
 

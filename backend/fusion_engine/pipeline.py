@@ -12,7 +12,12 @@ from backend.security_engine.evidence import (
     create_observation,
 )
 from backend.security_engine.scoring import calculate_security_score
-
+from backend.security_engine.metadata_exposure import (
+    assess_metadata_exposure,
+)
+from backend.feature_engine.traffic_features import (
+    extract_traffic_features,
+)
 
 PROJECT_ROOT = Path(__file__).parents[2]
 
@@ -84,10 +89,78 @@ def _build_observations(
 
     return observations
 
+METADATA_SEVERITY_ORDER = {
+    "LOW": 1,
+    "MEDIUM": 2,
+    "HIGH": 3,
+}
+
+
+def _metadata_findings(
+    esp: dict[str, Any],
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, Any] | None,
+]:
+    """
+    Assess metadata exposure across ESP flows and normalize the
+    highest-severity result into the security assessment model.
+
+    Per-flow metadata results remain available to the API layer.
+    """
+
+    feature_vectors = extract_traffic_features(esp)
+
+    if not feature_vectors:
+        return [], None
+
+    assessments = [
+        assess_metadata_exposure(feature_vector)
+        for feature_vector in feature_vectors
+    ]
+
+    findings: list[dict[str, Any]] = []
+
+    for assessment in assessments:
+        for finding in assessment["findings"]:
+            findings.append(
+                {
+                    "rule_id": (
+                        "IPSEC-META-"
+                        f"{finding['feature'].upper()}"
+                    ),
+                    "name": (
+                        f"Metadata exposure: "
+                        f"{finding['feature']}"
+                    ),
+                    "category": "metadata_exposure",
+                    "severity": finding["exposure_level"].lower(),
+                    "description": finding["explanation"],
+                    "recommendation": finding["recommendation"],
+                    "provenance": "ASSESSED",
+                    "evidence": {
+                        "field": finding["feature"],
+                        "value": finding["observed_value"],
+                    },
+                }
+            )
+
+    overall = max(
+        assessments,
+        key=lambda assessment: (
+            METADATA_SEVERITY_ORDER.get(
+                assessment["overall_exposure"],
+                0,
+            )
+        ),
+    )
+
+    return findings, overall
 
 def _build_controls(
     ike: dict[str, Any],
     esp: dict[str, Any],
+    metadata_assessment: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     """
     Build assessment controls only where evidence supports assessment.
@@ -117,6 +190,7 @@ def _build_controls(
                 ],
             )
         )
+
     else:
         controls.append(
             create_assessment_control(
@@ -124,10 +198,42 @@ def _build_controls(
                 name="Cryptographic Strength",
                 status=STATUS_NOT_ASSESSED,
                 reason=(
-                    "No directly observable IKE selected proposal "
-                    "was found in the PCAP."
+                    "No IKE selected proposal was directly observed "
+                    "in the PCAP."
                 ),
                 category="cryptography",
+            )
+        )
+
+    if metadata_assessment is not None:
+        controls.append(
+            create_assessment_control(
+                control_id="IPSEC-META-001",
+                name="Metadata Exposure",
+                status=STATUS_ASSESSED,
+                reason=(
+                    "ESP traffic metadata was analyzed across "
+                    "the observed bidirectional flows. Overall "
+                    f"assessed exposure: "
+                    f"{metadata_assessment['overall_exposure']}."
+                ),
+                category="metadata_exposure",
+                evidence_refs=[
+                    "esp.traffic_features",
+                ],
+            )
+        )
+    else:
+        controls.append(
+            create_assessment_control(
+                control_id="IPSEC-META-001",
+                name="Metadata Exposure",
+                status=STATUS_NOT_ASSESSED,
+                reason=(
+                    "No suitable ESP flow features were available "
+                    "for metadata exposure assessment."
+                ),
+                category="metadata_exposure",
             )
         )
 
@@ -158,20 +264,11 @@ def _build_controls(
                 ),
                 category="sa_security",
             ),
-            create_assessment_control(
-                control_id="IPSEC-META-001",
-                name="Metadata Exposure",
-                status=STATUS_NOT_ASSESSED,
-                reason=(
-                    "Metadata exposure analysis has not yet been "
-                    "implemented."
-                ),
-                category="metadata_exposure",
-            ),
         ]
     )
 
     return controls
+
 
 
 def analyze_pcap(
@@ -198,7 +295,9 @@ def analyze_pcap(
 
     ike = extract_ike_metadata(pcap_path)
     esp = extract_esp_metadata(pcap_path)
-
+    metadata_findings, metadata_assessment = _metadata_findings(
+        esp
+    )
     observations = _build_observations(
         ike,
         esp,
@@ -207,6 +306,7 @@ def analyze_pcap(
     controls = _build_controls(
         ike,
         esp,
+        metadata_assessment,
     )
 
     # Security rules currently operate on IKE metadata because
@@ -219,13 +319,19 @@ def analyze_pcap(
     assessment = build_assessment(
         observations=observations,
         controls=controls,
-        findings=assessment_result["findings"],
+        findings=(
+            assessment_result["findings"]
+            + metadata_findings
+        ),
     )
 
     score = calculate_security_score(
         controls=controls,
-        findings=assessment_result["findings"],
-        rule_path=SCORE_RULE_PATH,
+        findings=(
+            assessment_result["findings"]
+            + metadata_findings
+        ),
+    rule_path=SCORE_RULE_PATH,
     )
 
     return {
@@ -236,4 +342,5 @@ def analyze_pcap(
         "esp": esp,
         "assessment": assessment,
         "score": score,
+        "metadata_assessment": metadata_assessment,
     }
