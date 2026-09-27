@@ -130,7 +130,7 @@ def _header_footer(canvas: Any, document: Any) -> None:
     canvas.drawString(
         18 * mm,
         10 * mm,
-        "Sentinel IPsec Intelligence · SIH 26160",
+        "Sentinel IPsec Intelligence",
     )
 
     canvas.drawRightString(
